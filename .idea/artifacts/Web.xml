@@ -1,0 +1,16 @@
+<component name="ArtifactManager">
+  <artifact type="exploded-war" name="Web">
+    <output-path>$PROJECT_DIR$/.out/artifacts/Web</output-path>
+    <root id="root">
+      <element id="javaee-facet-resources" facet="teamcity-local-cloud/web/local-cloud" />
+      <element id="javaee-facet-resources" facet="web/web/Web" />
+      <element id="directory" name="WEB-INF">
+        <element id="directory" name="plugins">
+          <element id="directory" name="local-cloud">
+            <element id="artifact" artifact-name="Plugin" />
+          </element>
+        </element>
+      </element>
+    </root>
+  </artifact>
+</component>

@@ -1,0 +1,10 @@
+<component name="ArtifactManager">
+  <artifact name="Plugin Dist">
+    <output-path>$PROJECT_DIR$/dist</output-path>
+    <root id="root">
+      <element id="archive" name="local-cloud.zip">
+        <element id="artifact" artifact-name="Plugin" />
+      </element>
+    </root>
+  </artifact>
+</component>
