@@ -97,7 +97,7 @@ public class LocalCloudImage implements CloudImage {
     return new OneUseLocalCloudInstance(instanceId, this);
   }
 
-  private boolean isReusable() {
+  public boolean isReusable() {
     return getName().startsWith(LocalCloudConstants.RESULTABLE_PREFIX);
   }
 

@@ -18,3 +18,8 @@
 
 <jsp:useBean id="image" type="jetbrains.buildServer.clouds.local.LocalCloudImage" scope="request"/>
 Image location: <c:out value="${image.agentHomeDir.absolutePath}"/>
+
+<c:if test="${image.reusable}">
+ <br/>
+ Instances will be reused. Agent will be un-authorized after stop
+</c:if>
