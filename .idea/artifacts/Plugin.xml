@@ -1,10 +1,10 @@
 <component name="ArtifactManager">
   <artifact name="Plugin">
     <output-path>$PROJECT_DIR$/.out/artifacts/Plugin</output-path>
-    <properties id="ant-preprocessing">
-      <options>
+    <properties id="ant-postprocessing">
+      <options enabled="true">
         <file>file://$PROJECT_DIR$/build.xml</file>
-        <target>prepareVersion</target>
+        <target>replace-tokens-in-teamcity-plugin-xml</target>
       </options>
     </properties>
     <root id="root">
@@ -14,7 +14,7 @@
           <element id="dir-copy" path="$PROJECT_DIR$/resources" />
         </element>
       </element>
-      <element id="file-copy" path="$PROJECT_DIR$/teamcity-plugin.xml" />
+      <element id="file-copy" path="$PROJECT_DIR$/teamcity-plugin-dist.xml" output-file-name="teamcity-plugint.xml" />
     </root>
   </artifact>
 </component>

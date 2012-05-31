@@ -1,31 +1,30 @@
-<?xml version="1.0" encoding="UTF-8"?>
-<!--
-  ~ Copyright 2000-2012 JetBrains s.r.o.
-  ~
-  ~ Licensed under the Apache License, Version 2.0 (the "License");
-  ~ you may not use this file except in compliance with the License.
-  ~ You may obtain a copy of the License at
-  ~
-  ~ http://www.apache.org/licenses/LICENSE-2.0
-  ~
-  ~ Unless required by applicable law or agreed to in writing, software
-  ~ distributed under the License is distributed on an "AS IS" BASIS,
-  ~ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-  ~ See the License for the specific language governing permissions and
-  ~ limitations under the License.
-  -->
+<project name="build hooks" default="replace-tokens-in-teamcity-plugin-xml" basedir=".">
 
-<project name="local-cloud" default="prepareVersion" basedir=".">
 
-  <target name="prepareVersion">
+  <target name="replace-tokens-in-teamcity-plugin-xml">
+    <property name="home" value="${artifact.output.path}"/>
+
+    <echo message="replacing tokens in teamcity-plugin.xml file under ${home}"/>
+
     <tstamp>
-      <format property="DATE_TIME" pattern="yyyyMMddHHmmss"/>
+       <format property="snapshot" pattern="yyyyddMMHHmmss"/>
     </tstamp>
-    <filter token="DATE_TIME" value="${DATE_TIME}"/>
-    <copy file="${basedir}/teamcity-plugin-dist.xml"
-          tofile="${basedir}/teamcity-plugin.xml"
-          overwrite="true"
-          filtering="true"/>
+
+    <condition property="build.number" value="snapshot-${snapshot}" else="${build.number}">
+      <not>
+        <isset property="build.number"/>
+      </not>
+    </condition>
+
+    <echo message="Setting version to: ${build.number}"/>
+    <!-- update all references in teamcity-plugin.xml files -->
+    <replace dir="${home}" summary="true">
+      <include name="**/teamcity-plugin.xml"/>
+
+      <replacefilter token="@Plugin_Version@" value="${build.number}"/>
+      <replacefilter token="@Plugin_Vendor@" value="JetBrains, s.r.o."/>
+      <replacefilter token="@Plugin_Vendor_Url@" value="http://www.jetbrains.com"/>
+    </replace>
   </target>
 
 </project>
