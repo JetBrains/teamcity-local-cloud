@@ -18,11 +18,13 @@ package jetbrains.buildServer.clouds.local;
 
 import org.jetbrains.annotations.NotNull;
 
+import java.util.concurrent.atomic.AtomicInteger;
+
 public class IdGenerator {
-  private int myNextId = 0;
+  private final AtomicInteger myNextId = new AtomicInteger();
   
   @NotNull
   public String next() {
-    return String.valueOf(myNextId++);
+    return String.valueOf(myNextId.incrementAndGet());
   }
 }
