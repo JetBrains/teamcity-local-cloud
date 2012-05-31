@@ -1,23 +1,9 @@
-/*
- * Copyright 2000-2012 JetBrains s.r.o.
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- * http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
-
 package jetbrains.buildServer.clouds.local;
 
 import com.intellij.execution.configurations.GeneralCommandLine;
 import com.intellij.openapi.util.SystemInfo;
+import jetbrains.buildServer.ExecResult;
+import jetbrains.buildServer.SimpleCommandLineProcessRunner;
 import jetbrains.buildServer.clouds.CloudErrorInfo;
 import jetbrains.buildServer.clouds.CloudInstance;
 import jetbrains.buildServer.clouds.CloudInstanceUserData;
@@ -34,42 +20,59 @@ import java.io.File;
 import java.io.FileFilter;
 import java.io.IOException;
 import java.util.*;
+import java.util.concurrent.atomic.AtomicBoolean;
 
-public class LocalCloudInstance implements CloudInstance {
-  @NotNull private static final Logger LOG = Logger.getLogger(LocalCloudInstance.class);
+import static jetbrains.buildServer.clouds.local.LocalCloudConstants.IMAGE_ID_PARAM_NAME;
+import static jetbrains.buildServer.clouds.local.LocalCloudConstants.INSTANCE_ID_PARAM_NAME;
+
+/**
+ * @author Eugene Petrenko (eugene.petrenko@gmail.com)
+ *         Date: 31.05.12 18:35
+ */
+public abstract class LocalCloudInstance implements CloudInstance {
+  @NotNull
+  private static final Logger LOG = Logger.getLogger(LocalCloudInstance.class);
   private static final int STATUS_WAITING_TIMEOUT = 30 * 1000;
 
-  @NotNull private final String myId;
-  @NotNull private final LocalCloudImage myImage;
-  @NotNull private final CloudInstanceUserData myData;
-  @NotNull private final Date myStartDate;
-  @NotNull private final File myBaseDir;
+  @NotNull
+  private final String myId;
+  @NotNull
+  private final LocalCloudImage myImage;
+  @NotNull
+  private final Date myStartDate;
+  @NotNull
+  private final File myBaseDir;
+  @NotNull
+  private final AtomicBoolean myIsAgentExtracted = new AtomicBoolean(false);
+  @NotNull
+  private final AtomicBoolean myIsConfigPatched = new AtomicBoolean(false);
 
-  @NotNull private volatile InstanceStatus myStatus;
-  @Nullable private volatile CloudErrorInfo myErrorInfo;
+  @NotNull
+  private volatile InstanceStatus myStatus;
+  @Nullable
+  private volatile CloudErrorInfo myErrorInfo;
 
-  @NotNull private static final Set<String> ourDirsToNotToCopy = new HashSet<String>() {{
-    Collections.addAll(this, "work", "temp", "system", "contrib");
-  }}; 
-
-  public LocalCloudInstance(@NotNull final String instanceId,
-                     @NotNull final LocalCloudImage image,
-                     @NotNull final CloudInstanceUserData data) {
-    myId = instanceId;
+  public LocalCloudInstance(@NotNull final LocalCloudImage image, @NotNull final String instanceId) {
     myImage = image;
-    myData = data;
-    myStartDate = new Date();
-    myStatus = InstanceStatus.SCHEDULED_TO_START;
     myBaseDir = createBaseDir(); // can set status to ERROR, so must be after "myStatus = ..." line
     myBaseDir.deleteOnExit();
+    myStatus = InstanceStatus.SCHEDULED_TO_START;
+    myId = instanceId;
+    myStartDate = new Date();
+  }
+
+  public abstract boolean isRestartable();
+
+  @NotNull
+  protected File getBaseDir() {
+    return myBaseDir;
   }
 
   @NotNull
   private File createBaseDir() {
     try {
       return FileUtil.createTempDirectory("tc_buildAgent_", "");
-    }
-    catch (final IOException e) {
+    } catch (final IOException e) {
       processError(e);
       return new File("");
     }
@@ -116,48 +119,67 @@ public class LocalCloudInstance implements CloudInstance {
 
   public boolean containsAgent(@NotNull final AgentDescription agentDescription) {
     final Map<String, String> configParams = agentDescription.getConfigurationParameters();
-    return myId.equals(configParams.get(LocalCloudConstants.INSTANCE_ID_PARAM_NAME)) &&
-           getImageId().equals(configParams.get(LocalCloudConstants.IMAGE_ID_PARAM_NAME));
+    return myId.equals(configParams.get(INSTANCE_ID_PARAM_NAME)) &&
+            getImageId().equals(configParams.get(IMAGE_ID_PARAM_NAME));
   }
 
-  public void start() {
+  public void start(@NotNull final CloudInstanceUserData data) {
     myStatus = InstanceStatus.STARTING;
 
     try {
-      final File agentHomeDir = myImage.getAgentHomeDir();
-      FileUtil.copyDir(agentHomeDir, myBaseDir, new FileFilter() {
-        public boolean accept(@NotNull final File file) {
-          return !file.isDirectory() || !file.getParentFile().equals(agentHomeDir) || !ourDirsToNotToCopy.contains(file.getName());
-        }
-      });
 
-      File inConfigFile = new File(new File(myBaseDir, "conf"), "buildAgent.properties"), outConfigFile = inConfigFile;
-      if (!inConfigFile.isFile()) {
-        inConfigFile = new File(new File(myBaseDir, "conf"), "buildAgent.dist.properties");
-        if (!inConfigFile.isFile()) {
-          inConfigFile = null;
-        }
-      }
-      final Properties config = PropertiesUtil.loadProperties(inConfigFile);
-      config.put("name", myData.getAgentName());
-      config.put("serverUrl", myData.getServerAddress());
-      config.put("workDir", "../work");
-      config.put("tempDir", "../temp");
-      config.put("systemDir", "../system");
-      config.put("authorizationToken", myData.getAuthToken());
-      for (final Map.Entry<String, String> param : myData.getCustomAgentConfigurationParameters().entrySet()) {
-        config.put(param.getKey(), param.getValue());
-      }
-      config.put(LocalCloudConstants.IMAGE_ID_PARAM_NAME, getImageId());
-      config.put(LocalCloudConstants.INSTANCE_ID_PARAM_NAME, myId);
-      PropertiesUtil.storeProperties(config, outConfigFile, null);
+      copyAgentToDestFolder();
+      updateAgentProperties(data);
 
       doStart();
       myStatus = InstanceStatus.RUNNING;
-    }
-    catch (final Exception e) {
+    } catch (final Exception e) {
       processError(e);
     }
+  }
+
+  private void updateAgentProperties(@NotNull final CloudInstanceUserData data) throws IOException {
+    File inConfigFile = new File(new File(myBaseDir, "conf"), "buildAgent.properties"), outConfigFile = inConfigFile;
+    if (!inConfigFile.isFile()) {
+      inConfigFile = new File(new File(myBaseDir, "conf"), "buildAgent.dist.properties");
+      if (!inConfigFile.isFile()) {
+        inConfigFile = null;
+      }
+    }
+    final Properties config = PropertiesUtil.loadProperties(inConfigFile);
+
+    config.put("serverUrl", data.getServerAddress());
+    config.put("workDir", "../work");
+    config.put("tempDir", "../temp");
+    config.put("systemDir", "../system");
+
+    //agent name and auth-token must be patched only once
+    if (!myIsConfigPatched.getAndSet(true)) {
+      config.put("name", data.getAgentName());
+      config.put("authorizationToken", data.getAuthToken());
+    }
+    for (final Map.Entry<String, String> param : data.getCustomAgentConfigurationParameters().entrySet()) {
+      config.put(param.getKey(), param.getValue());
+    }
+    config.put(IMAGE_ID_PARAM_NAME, getImageId());
+    config.put(INSTANCE_ID_PARAM_NAME, myId);
+    PropertiesUtil.storeProperties(config, outConfigFile, null);
+  }
+
+  private void copyAgentToDestFolder() throws IOException {
+    //do not re-extract agent
+    if (myIsAgentExtracted.getAndSet(true)) return;
+
+    final File agentHomeDir = myImage.getAgentHomeDir();
+    FileUtil.copyDir(agentHomeDir, myBaseDir, new FileFilter() {
+      private final Set<String> ourDirsToNotToCopy = new HashSet<String>() {{
+        Collections.addAll(this, "work", "temp", "system", "contrib");
+      }};
+
+      public boolean accept(@NotNull final File file) {
+        return !file.isDirectory() || !file.getParentFile().equals(agentHomeDir) || !ourDirsToNotToCopy.contains(file.getName());
+      }
+    });
   }
 
   public void restart() {
@@ -167,30 +189,23 @@ public class LocalCloudInstance implements CloudInstance {
       doStop();
       Thread.sleep(3000);
       doStart();
-    }
-    catch (final Exception e) {
+    } catch (final Exception e) {
       processError(e);
     }
   }
 
   public void terminate() {
-    //busy wait is not allowed in cloud API
-    waitForStatus(InstanceStatus.RUNNING);
     myStatus = InstanceStatus.STOPPING;
     try {
       doStop();
       myStatus = InstanceStatus.STOPPED;
       cleanupStoppedInstance();
-    }
-    catch (final Exception e) {
+    } catch (final Exception e) {
       processError(e);
     }
   }
 
-  private void cleanupStoppedInstance() {
-    myImage.forgetInstance(this);
-    FileUtil.delete(myBaseDir);
-  }
+  protected abstract void cleanupStoppedInstance();
 
   private void waitForStatus(@NotNull final InstanceStatus status) {
     new WaitFor(STATUS_WAITING_TIMEOUT) {
@@ -220,14 +235,23 @@ public class LocalCloudInstance implements CloudInstance {
     final GeneralCommandLine cmd = new GeneralCommandLine();
     final File workDir = new File(myBaseDir, "bin");
     cmd.setWorkDirectory(workDir.getAbsolutePath());
-    cmd.setExePath(new File(workDir, SystemInfo.isWindows ? "agent.bat" : "agent.sh").getAbsolutePath());
-    cmd.addParameters(params);
-    final Process ps = cmd.createProcess();
-    //to avoid lock
-    FileUtil.closeAll(ps.getErrorStream(), ps.getOutputStream(), ps.getInputStream());
+    final Map<String, String> env = new HashMap<String, String>(System.getenv());
+    //fix Java
+    env.put("JAVA_HOME", System.getProperty("java.home"));
 
-    //let's wait for process to finish
-    //don't care about result for now
-    ps.waitFor();
+    if (SystemInfo.isWindows) {
+      cmd.setExePath("cmd.exe");
+      cmd.addParameter("/c");
+      cmd.addParameter(new File(workDir, "agent.bat").getAbsolutePath());
+    } else {
+      cmd.setExePath(new File(workDir, SystemInfo.isWindows ? "agent.bat" : "agent.sh").getAbsolutePath());
+    }
+    cmd.addParameters(params);
+
+    LOG.info("Starting agent: " + cmd.getCommandLineString());
+    ExecResult execResult = SimpleCommandLineProcessRunner.runCommand(cmd, null);
+    LOG.info("Execution finished: " + execResult.getExitCode());
+    LOG.info(execResult.getStdout());
+    LOG.info(execResult.getStderr());
   }
 }

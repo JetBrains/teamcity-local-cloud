@@ -16,24 +16,21 @@
 
 package jetbrains.buildServer.clouds.local;
 
-import jetbrains.buildServer.clouds.CloudErrorInfo;
-import jetbrains.buildServer.clouds.CloudImage;
-import jetbrains.buildServer.clouds.CloudInstance;
-import jetbrains.buildServer.clouds.CloudInstanceUserData;
+import jetbrains.buildServer.clouds.*;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import java.io.File;
 import java.util.Collection;
 import java.util.Collections;
-import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
 public class LocalCloudImage implements CloudImage {
   @NotNull private final String myId;
   @NotNull private final String myName;
   @NotNull private final File myAgentHomeDir;
-  @NotNull private final Map<String, LocalCloudInstance> myInstances = new HashMap<String, LocalCloudInstance>();
+  @NotNull private final Map<String, LocalCloudInstance> myInstances = new ConcurrentHashMap<String, jetbrains.buildServer.clouds.local.LocalCloudInstance>();
   @NotNull private final IdGenerator myInstanceIdGenerator = new IdGenerator();
   @Nullable private final CloudErrorInfo myErrorInfo;
 
@@ -77,12 +74,31 @@ public class LocalCloudImage implements CloudImage {
   }
 
   @NotNull
-  public LocalCloudInstance startNewInstance(@NotNull final CloudInstanceUserData data) {
+  public synchronized LocalCloudInstance startNewInstance(@NotNull final CloudInstanceUserData data) {
+    //check reusable instances
+    for (LocalCloudInstance instance : myInstances.values()) {
+      if (instance.getErrorInfo() == null && instance.getStatus() == InstanceStatus.STOPPED && instance.isRestartable()) {
+        instance.start(data);
+        return instance;
+      }
+    }
+
     final String instanceId = myInstanceIdGenerator.next();
-    final LocalCloudInstance instance = new LocalCloudInstance(instanceId, this, data);
+    final LocalCloudInstance instance = createInstance(instanceId);
     myInstances.put(instanceId, instance);
-    instance.start();
+    instance.start(data);
     return instance;
+  }
+
+  protected LocalCloudInstance createInstance(String instanceId) {
+    if (isReusable()) {
+      return new ReStartableInstance(instanceId, this);
+    }
+    return new OneUseLocalCloudInstance(instanceId, this);
+  }
+
+  private boolean isReusable() {
+    return getName().startsWith(LocalCloudConstants.RESULTABLE_PREFIX);
   }
 
   void forgetInstance(@NotNull final LocalCloudInstance instance) {

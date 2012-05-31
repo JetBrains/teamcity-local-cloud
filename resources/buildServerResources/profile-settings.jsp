@@ -24,9 +24,11 @@
   <th><label for="${paramName}">Agent images:</label></th>
   <td>
     <props:multilineProperty name="${paramName}" className="longField" linkTitle="Agent images to run" cols="55" rows="5" expanded="${true}"/>
-    <%--<span id="error_${paramName}" class="error"></span>--%>
     <span class="smallNote">
       List of agent images, each on new line. Image format: "&lt;Image name&gt;@&lt;Local path to agent installation folder&gt;".
+      <br />
+      If image name starts with <em><%=LocalCloudConstants.RESULTABLE_PREFIX%></em> prefix,
+      agents will not be removed and will be restarted in on-demand basis.
     </span>
   </td>
 </tr>
