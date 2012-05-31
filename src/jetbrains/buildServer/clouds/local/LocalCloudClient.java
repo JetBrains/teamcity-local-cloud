@@ -19,8 +19,6 @@ package jetbrains.buildServer.clouds.local;
 import jetbrains.buildServer.clouds.*;
 import jetbrains.buildServer.serverSide.AgentDescription;
 import jetbrains.buildServer.serverSide.BuildServerAdapter;
-import jetbrains.buildServer.serverSide.SBuildAgent;
-import jetbrains.buildServer.serverSide.SBuildServer;
 import jetbrains.buildServer.util.StringUtil;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -31,14 +29,10 @@ import java.util.Collections;
 import java.util.List;
 
 public class LocalCloudClient extends BuildServerAdapter implements CloudClientEx {
-  @NotNull private final SBuildServer myServer;
   @NotNull private final List<LocalCloudImage> myImages = new ArrayList<LocalCloudImage>();
   @Nullable private final CloudErrorInfo myErrorInfo;
 
-  public LocalCloudClient(@NotNull final SBuildServer server, @NotNull final CloudClientParameters params) {
-    myServer = server;
-    myServer.addListener(this);
-    
+  public LocalCloudClient(@NotNull final CloudClientParameters params) {
     final String images = params.getParameter(LocalCloudConstants.IMAGES_PROFILE_SETTING);
     if (images == null || images.trim().length() == 0) {
       myErrorInfo = new CloudErrorInfo("No images specified");
@@ -117,23 +111,6 @@ public class LocalCloudClient extends BuildServerAdapter implements CloudClientE
     return "img-" + image.getName() + "-" + instanceId;
   }
 
-  @Override
-  public void agentRegistered(@NotNull final SBuildAgent agent, final long currentlyRunningBuildId) {
-    final LocalCloudInstance instance = findInstanceByAgent(agent);
-    if (instance != null) {
-      instance.setAgentRegistered(true);
-    }
-  }
-
-  @Override
-  public void agentUnregistered(@NotNull final SBuildAgent agent) {
-    final LocalCloudInstance instance = findInstanceByAgent(agent);
-    if (instance != null) {
-      instance.setAgentRegistered(false);
-      instance.getImage().forgetInstance(instance);
-    }
-  }
-
   @NotNull
   public CloudInstance startNewInstance(@NotNull final CloudImage image, @NotNull final CloudInstanceUserData data) throws QuotaException {
     return ((LocalCloudImage)image).startNewInstance(data);
@@ -148,7 +125,6 @@ public class LocalCloudClient extends BuildServerAdapter implements CloudClientE
   }
 
   public void dispose() {
-    myServer.removeListener(this);
     for (final LocalCloudImage image : myImages) {
       image.dispose();
     }

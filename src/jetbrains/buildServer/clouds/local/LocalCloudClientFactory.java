@@ -16,27 +16,26 @@
 
 package jetbrains.buildServer.clouds.local;
 
-import java.util.Collection;
-import java.util.Collections;
-import java.util.Map;
-import jetbrains.buildServer.DevelopmentMode;
 import jetbrains.buildServer.clouds.CloudClientFactory;
 import jetbrains.buildServer.clouds.CloudClientParameters;
 import jetbrains.buildServer.clouds.CloudRegistrar;
 import jetbrains.buildServer.clouds.CloudState;
-import jetbrains.buildServer.serverSide.*;
+import jetbrains.buildServer.serverSide.AgentDescription;
+import jetbrains.buildServer.serverSide.InvalidProperty;
+import jetbrains.buildServer.serverSide.PropertiesProcessor;
 import jetbrains.buildServer.web.openapi.PluginDescriptor;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
+import java.util.Collection;
+import java.util.Collections;
+import java.util.Map;
+
 public class LocalCloudClientFactory implements CloudClientFactory {
-  @NotNull private final SBuildServer myServer;
   @NotNull private final String myJspPath;
   
   public LocalCloudClientFactory(@NotNull final CloudRegistrar cloudRegistrar,
-                                 @NotNull final PluginDescriptor pluginDescriptor,
-                                 @NotNull final SBuildServer server) {
-    myServer = server;
+                                 @NotNull final PluginDescriptor pluginDescriptor) {
     myJspPath = pluginDescriptor.getPluginResourcesPath("profile-settings.jsp");
     cloudRegistrar.registerCloudFactory(this);
   }
@@ -78,7 +77,7 @@ public class LocalCloudClientFactory implements CloudClientFactory {
 
   @NotNull
   public LocalCloudClient createNewClient(@NotNull final CloudState state, @NotNull final CloudClientParameters params) {
-    return new LocalCloudClient(myServer, params);
+    return new LocalCloudClient(params);
   }
 }
 

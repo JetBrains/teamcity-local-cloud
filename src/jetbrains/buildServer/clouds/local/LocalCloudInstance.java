@@ -16,7 +16,6 @@
 
 package jetbrains.buildServer.clouds.local;
 
-import com.intellij.execution.ExecutionException;
 import com.intellij.execution.configurations.GeneralCommandLine;
 import com.intellij.openapi.util.SystemInfo;
 import jetbrains.buildServer.clouds.CloudErrorInfo;
@@ -53,7 +52,7 @@ public class LocalCloudInstance implements CloudInstance {
     Collections.addAll(this, "work", "temp", "system", "contrib");
   }}; 
 
-  LocalCloudInstance(@NotNull final String instanceId,
+  public LocalCloudInstance(@NotNull final String instanceId,
                      @NotNull final LocalCloudImage image,
                      @NotNull final CloudInstanceUserData data) {
     myId = instanceId;
@@ -121,18 +120,7 @@ public class LocalCloudInstance implements CloudInstance {
            getImageId().equals(configParams.get(LocalCloudConstants.IMAGE_ID_PARAM_NAME));
   }
 
-  void setAgentRegistered(final boolean registered) {
-    if (registered) {
-      myStatus = InstanceStatus.RUNNING;
-    }
-    else {
-      if (myStatus != InstanceStatus.RESTARTING) {
-        myStatus = InstanceStatus.STOPPED;
-      }
-    }
-  }
-
-  void start() {
+  public void start() {
     myStatus = InstanceStatus.STARTING;
 
     try {
@@ -165,13 +153,14 @@ public class LocalCloudInstance implements CloudInstance {
       PropertiesUtil.storeProperties(config, outConfigFile, null);
 
       doStart();
+      myStatus = InstanceStatus.RUNNING;
     }
     catch (final Exception e) {
       processError(e);
     }
   }
 
-  void restart() {
+  public void restart() {
     waitForStatus(InstanceStatus.RUNNING);
     myStatus = InstanceStatus.RESTARTING;
     try {
@@ -184,17 +173,23 @@ public class LocalCloudInstance implements CloudInstance {
     }
   }
 
-  void terminate() {
+  public void terminate() {
+    //busy wait is not allowed in cloud API
     waitForStatus(InstanceStatus.RUNNING);
     myStatus = InstanceStatus.STOPPING;
     try {
       doStop();
-      waitForStatus(InstanceStatus.STOPPED);
-      FileUtil.delete(myBaseDir);
+      myStatus = InstanceStatus.STOPPED;
+      cleanupStoppedInstance();
     }
     catch (final Exception e) {
       processError(e);
     }
+  }
+
+  private void cleanupStoppedInstance() {
+    myImage.forgetInstance(this);
+    FileUtil.delete(myBaseDir);
   }
 
   private void waitForStatus(@NotNull final InstanceStatus status) {
@@ -213,20 +208,26 @@ public class LocalCloudInstance implements CloudInstance {
     myStatus = InstanceStatus.ERROR;
   }
 
-  private void doStart() throws ExecutionException {
+  private void doStart() throws Exception {
     exec("start");
   }
 
-  private void doStop() throws ExecutionException {
+  private void doStop() throws Exception {
     exec("stop", "force");
   }
 
-  private void exec(@NotNull final String... params) throws ExecutionException {
+  private void exec(@NotNull final String... params) throws Exception {
     final GeneralCommandLine cmd = new GeneralCommandLine();
     final File workDir = new File(myBaseDir, "bin");
     cmd.setWorkDirectory(workDir.getAbsolutePath());
     cmd.setExePath(new File(workDir, SystemInfo.isWindows ? "agent.bat" : "agent.sh").getAbsolutePath());
     cmd.addParameters(params);
-    cmd.createProcess();
+    final Process ps = cmd.createProcess();
+    //to avoid lock
+    FileUtil.closeAll(ps.getErrorStream(), ps.getOutputStream(), ps.getInputStream());
+
+    //let's wait for process to finish
+    //don't care about result for now
+    ps.waitFor();
   }
 }
