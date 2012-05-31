@@ -16,10 +16,6 @@
 
 package jetbrains.buildServer.clouds.local;
 
-import java.util.Collection;
-import java.util.Collections;
-import java.util.List;
-import java.util.ArrayList;
 import jetbrains.buildServer.clouds.*;
 import jetbrains.buildServer.serverSide.AgentDescription;
 import jetbrains.buildServer.serverSide.BuildServerAdapter;
@@ -29,12 +25,17 @@ import jetbrains.buildServer.util.StringUtil;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.List;
+
 public class LocalCloudClient extends BuildServerAdapter implements CloudClientEx {
   @NotNull private final SBuildServer myServer;
   @NotNull private final List<LocalCloudImage> myImages = new ArrayList<LocalCloudImage>();
   @Nullable private final CloudErrorInfo myErrorInfo;
 
-  LocalCloudClient(@NotNull final SBuildServer server, @NotNull final CloudClientParameters params) {
+  public LocalCloudClient(@NotNull final SBuildServer server, @NotNull final CloudClientParameters params) {
     myServer = server;
     myServer.addListener(this);
     
@@ -50,7 +51,7 @@ public class LocalCloudClient extends BuildServerAdapter implements CloudClientE
     for (final  String imageInfo : StringUtil.splitByLines(images.trim())) {
       final int atPos = imageInfo.indexOf('@');
       if (atPos < 0) {
-        error.append(" Failed to parse image info: \"" + imageInfo + "\".");
+        error.append(" Failed to parse image info: \"").append(imageInfo).append("\".");
         continue;
       }
 

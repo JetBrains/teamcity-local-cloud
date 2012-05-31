@@ -19,11 +19,10 @@ package jetbrains.buildServer.clouds.local;
 import com.intellij.execution.ExecutionException;
 import com.intellij.execution.configurations.GeneralCommandLine;
 import com.intellij.openapi.util.SystemInfo;
-import java.io.File;
-import java.io.FileFilter;
-import java.io.IOException;
-import java.util.*;
-import jetbrains.buildServer.clouds.*;
+import jetbrains.buildServer.clouds.CloudErrorInfo;
+import jetbrains.buildServer.clouds.CloudInstance;
+import jetbrains.buildServer.clouds.CloudInstanceUserData;
+import jetbrains.buildServer.clouds.InstanceStatus;
 import jetbrains.buildServer.serverSide.AgentDescription;
 import jetbrains.buildServer.util.FileUtil;
 import jetbrains.buildServer.util.PropertiesUtil;
@@ -31,6 +30,11 @@ import jetbrains.buildServer.util.WaitFor;
 import org.apache.log4j.Logger;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
+
+import java.io.File;
+import java.io.FileFilter;
+import java.io.IOException;
+import java.util.*;
 
 public class LocalCloudInstance implements CloudInstance {
   @NotNull private static final Logger LOG = Logger.getLogger(LocalCloudInstance.class);
@@ -41,8 +45,9 @@ public class LocalCloudInstance implements CloudInstance {
   @NotNull private final CloudInstanceUserData myData;
   @NotNull private final Date myStartDate;
   @NotNull private final File myBaseDir;
-  @NotNull private InstanceStatus myStatus;
-  @Nullable private CloudErrorInfo myErrorInfo;
+
+  @NotNull private volatile InstanceStatus myStatus;
+  @Nullable private volatile CloudErrorInfo myErrorInfo;
 
   @NotNull private static final Set<String> ourDirsToNotToCopy = new HashSet<String>() {{
     Collections.addAll(this, "work", "temp", "system", "contrib");

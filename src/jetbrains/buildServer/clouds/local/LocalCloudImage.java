@@ -16,14 +16,18 @@
 
 package jetbrains.buildServer.clouds.local;
 
+import jetbrains.buildServer.clouds.CloudErrorInfo;
+import jetbrains.buildServer.clouds.CloudImage;
+import jetbrains.buildServer.clouds.CloudInstance;
+import jetbrains.buildServer.clouds.CloudInstanceUserData;
+import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
+
 import java.io.File;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
-import jetbrains.buildServer.clouds.*;
-import org.jetbrains.annotations.NotNull;
-import org.jetbrains.annotations.Nullable;
 
 public class LocalCloudImage implements CloudImage {
   @NotNull private final String myId;
@@ -33,9 +37,9 @@ public class LocalCloudImage implements CloudImage {
   @NotNull private final IdGenerator myInstanceIdGenerator = new IdGenerator();
   @Nullable private final CloudErrorInfo myErrorInfo;
 
-  LocalCloudImage(@NotNull final String imageId,
-                  @NotNull final String imageName,
-                  @NotNull final String agentHomePath) {
+  public LocalCloudImage(@NotNull final String imageId,
+                         @NotNull final String imageName,
+                         @NotNull final String agentHomePath) {
     myId = imageId;
     myName = imageName;
     myAgentHomeDir = new File(agentHomePath);
@@ -50,11 +54,6 @@ public class LocalCloudImage implements CloudImage {
   @NotNull
   public String getName() {
     return myName;
-  }
-
-  @NotNull
-  public String getDescription() {
-    return getAgentHomeDir().getAbsolutePath();
   }
 
   @NotNull
@@ -78,7 +77,7 @@ public class LocalCloudImage implements CloudImage {
   }
 
   @NotNull
-  LocalCloudInstance startNewInstance(@NotNull final CloudInstanceUserData data) {
+  public LocalCloudInstance startNewInstance(@NotNull final CloudInstanceUserData data) {
     final String instanceId = myInstanceIdGenerator.next();
     final LocalCloudInstance instance = new LocalCloudInstance(instanceId, this, data);
     myInstances.put(instanceId, instance);
