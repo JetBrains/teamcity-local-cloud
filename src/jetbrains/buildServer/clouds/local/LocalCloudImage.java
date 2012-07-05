@@ -23,8 +23,10 @@ import org.jetbrains.annotations.Nullable;
 import java.io.File;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ScheduledExecutorService;
 
 public class LocalCloudImage implements CloudImage {
   @NotNull private final String myId;
@@ -33,14 +35,45 @@ public class LocalCloudImage implements CloudImage {
   @NotNull private final Map<String, LocalCloudInstance> myInstances = new ConcurrentHashMap<String, jetbrains.buildServer.clouds.local.LocalCloudInstance>();
   @NotNull private final IdGenerator myInstanceIdGenerator = new IdGenerator();
   @Nullable private final CloudErrorInfo myErrorInfo;
+  private boolean myIsReusable;
+  private boolean myIsEternalStarting;
+  private final Map<String, String> myExtraProperties = new HashMap<String, String>();
+  @NotNull private final ScheduledExecutorService myExecutor;
 
   public LocalCloudImage(@NotNull final String imageId,
                          @NotNull final String imageName,
-                         @NotNull final String agentHomePath) {
+                         @NotNull final String agentHomePath,
+                         @NotNull final ScheduledExecutorService executor) {
     myId = imageId;
     myName = imageName;
     myAgentHomeDir = new File(agentHomePath);
+    myExecutor = executor;
     myErrorInfo = myAgentHomeDir.isDirectory() ? null : new CloudErrorInfo("\"" + agentHomePath + "\" is not a directory or does not exist.");
+  }
+
+  public boolean isReusable() {
+    return myIsReusable;
+  }
+
+  public void setIsReusable(boolean isReusable) {
+    myIsReusable = isReusable;
+  }
+
+  public boolean isEternalStarting() {
+    return myIsEternalStarting;
+  }
+
+  public void setIsEternalStarting(boolean isEternalStarting) {
+    myIsEternalStarting = isEternalStarting;
+  }
+
+  public void addExtraProperty(@NotNull final String name, @NotNull final String value) {
+    myExtraProperties.put(name, value);
+  }
+
+  @NotNull
+  public Map<String, String> getExtraProperties() {
+    return myExtraProperties;
   }
 
   @NotNull
@@ -75,6 +108,10 @@ public class LocalCloudImage implements CloudImage {
 
   @NotNull
   public synchronized LocalCloudInstance startNewInstance(@NotNull final CloudInstanceUserData data) {
+    for (Map.Entry<String, String> e : myExtraProperties.entrySet()) {
+      data.addAgentConfigurationParameter(e.getKey(), e.getValue());
+    }
+
     //check reusable instances
     for (LocalCloudInstance instance : myInstances.values()) {
       if (instance.getErrorInfo() == null && instance.getStatus() == InstanceStatus.STOPPED && instance.isRestartable()) {
@@ -92,13 +129,9 @@ public class LocalCloudImage implements CloudImage {
 
   protected LocalCloudInstance createInstance(String instanceId) {
     if (isReusable()) {
-      return new ReStartableInstance(instanceId, this);
+      return new ReStartableInstance(instanceId, this, myExecutor);
     }
-    return new OneUseLocalCloudInstance(instanceId, this);
-  }
-
-  public boolean isReusable() {
-    return getName().startsWith(LocalCloudConstants.RESULTABLE_PREFIX);
+    return new OneUseLocalCloudInstance(instanceId, this, myExecutor);
   }
 
   void forgetInstance(@NotNull final LocalCloudInstance instance) {

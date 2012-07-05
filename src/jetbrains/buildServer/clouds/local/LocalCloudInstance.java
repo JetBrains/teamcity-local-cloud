@@ -9,6 +9,7 @@ import jetbrains.buildServer.clouds.CloudInstance;
 import jetbrains.buildServer.clouds.CloudInstanceUserData;
 import jetbrains.buildServer.clouds.InstanceStatus;
 import jetbrains.buildServer.serverSide.AgentDescription;
+import jetbrains.buildServer.util.ExceptionUtil;
 import jetbrains.buildServer.util.FileUtil;
 import jetbrains.buildServer.util.PropertiesUtil;
 import jetbrains.buildServer.util.WaitFor;
@@ -20,6 +21,7 @@ import java.io.File;
 import java.io.FileFilter;
 import java.io.IOException;
 import java.util.*;
+import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import static jetbrains.buildServer.clouds.local.LocalCloudConstants.IMAGE_ID_PARAM_NAME;
@@ -52,13 +54,17 @@ public abstract class LocalCloudInstance implements CloudInstance {
   @Nullable
   private volatile CloudErrorInfo myErrorInfo;
 
-  public LocalCloudInstance(@NotNull final LocalCloudImage image, @NotNull final String instanceId) {
+  @NotNull
+  private final ScheduledExecutorService myAsync;
+
+  public LocalCloudInstance(@NotNull final LocalCloudImage image, @NotNull final String instanceId, @NotNull ScheduledExecutorService executor) {
     myImage = image;
     myBaseDir = createBaseDir(); // can set status to ERROR, so must be after "myStatus = ..." line
     myBaseDir.deleteOnExit();
     myStatus = InstanceStatus.SCHEDULED_TO_START;
     myId = instanceId;
     myStartDate = new Date();
+    myAsync = executor;
   }
 
   public abstract boolean isRestartable();
@@ -126,60 +132,7 @@ public abstract class LocalCloudInstance implements CloudInstance {
   public void start(@NotNull final CloudInstanceUserData data) {
     myStatus = InstanceStatus.STARTING;
 
-    try {
-
-      copyAgentToDestFolder();
-      updateAgentProperties(data);
-
-      doStart();
-      myStatus = InstanceStatus.RUNNING;
-    } catch (final Exception e) {
-      processError(e);
-    }
-  }
-
-  private void updateAgentProperties(@NotNull final CloudInstanceUserData data) throws IOException {
-    File inConfigFile = new File(new File(myBaseDir, "conf"), "buildAgent.properties"), outConfigFile = inConfigFile;
-    if (!inConfigFile.isFile()) {
-      inConfigFile = new File(new File(myBaseDir, "conf"), "buildAgent.dist.properties");
-      if (!inConfigFile.isFile()) {
-        inConfigFile = null;
-      }
-    }
-    final Properties config = PropertiesUtil.loadProperties(inConfigFile);
-
-    config.put("serverUrl", data.getServerAddress());
-    config.put("workDir", "../work");
-    config.put("tempDir", "../temp");
-    config.put("systemDir", "../system");
-
-    //agent name and auth-token must be patched only once
-    if (!myIsConfigPatched.getAndSet(true)) {
-      config.put("name", data.getAgentName());
-      config.put("authorizationToken", data.getAuthToken());
-    }
-    for (final Map.Entry<String, String> param : data.getCustomAgentConfigurationParameters().entrySet()) {
-      config.put(param.getKey(), param.getValue());
-    }
-    config.put(IMAGE_ID_PARAM_NAME, getImageId());
-    config.put(INSTANCE_ID_PARAM_NAME, myId);
-    PropertiesUtil.storeProperties(config, outConfigFile, null);
-  }
-
-  private void copyAgentToDestFolder() throws IOException {
-    //do not re-extract agent
-    if (myIsAgentExtracted.getAndSet(true)) return;
-
-    final File agentHomeDir = myImage.getAgentHomeDir();
-    FileUtil.copyDir(agentHomeDir, myBaseDir, new FileFilter() {
-      private final Set<String> ourDirsToNotToCopy = new HashSet<String>() {{
-        Collections.addAll(this, "work", "temp", "system", "contrib");
-      }};
-
-      public boolean accept(@NotNull final File file) {
-        return !file.isDirectory() || !file.getParentFile().equals(agentHomeDir) || !ourDirsToNotToCopy.contains(file.getName());
-      }
-    });
+    myAsync.submit(ExceptionUtil.catchAll("start local cloud: " + this, new StartAgentCommand(data)));
   }
 
   public void restart() {
@@ -253,5 +206,73 @@ public abstract class LocalCloudInstance implements CloudInstance {
     LOG.info("Execution finished: " + execResult.getExitCode());
     LOG.info(execResult.getStdout());
     LOG.info(execResult.getStderr());
+  }
+
+  private class StartAgentCommand implements Runnable {
+    private final CloudInstanceUserData myData;
+
+    public StartAgentCommand(@NotNull final CloudInstanceUserData data) {
+      myData = data;
+    }
+
+    private void copyAgentToDestFolder() throws IOException {
+      //do not re-extract agent
+      if (myIsAgentExtracted.getAndSet(true)) return;
+
+      final File agentHomeDir = myImage.getAgentHomeDir();
+      FileUtil.copyDir(agentHomeDir, myBaseDir, new FileFilter() {
+        private final Set<String> ourDirsToNotToCopy = new HashSet<String>() {{
+          Collections.addAll(this, "work", "temp", "system", "contrib");
+        }};
+
+        public boolean accept(@NotNull final File file) {
+          return !file.isDirectory() || !file.getParentFile().equals(agentHomeDir) || !ourDirsToNotToCopy.contains(file.getName());
+        }
+      });
+    }
+
+    private void updateAgentProperties(@NotNull final CloudInstanceUserData data) throws IOException {
+      File inConfigFile = new File(new File(myBaseDir, "conf"), "buildAgent.properties"), outConfigFile = inConfigFile;
+      if (!inConfigFile.isFile()) {
+        inConfigFile = new File(new File(myBaseDir, "conf"), "buildAgent.dist.properties");
+        if (!inConfigFile.isFile()) {
+          inConfigFile = null;
+        }
+      }
+      final Properties config = PropertiesUtil.loadProperties(inConfigFile);
+
+      config.put("serverUrl", data.getServerAddress());
+      config.put("workDir", "../work");
+      config.put("tempDir", "../temp");
+      config.put("systemDir", "../system");
+
+      //agent name and auth-token must be patched only once
+      if (!myIsConfigPatched.getAndSet(true)) {
+        config.put("name", data.getAgentName());
+        config.put("authorizationToken", data.getAuthToken());
+      }
+      for (final Map.Entry<String, String> param : data.getCustomAgentConfigurationParameters().entrySet()) {
+        config.put(param.getKey(), param.getValue());
+      }
+      config.put(IMAGE_ID_PARAM_NAME, getImageId());
+      config.put(INSTANCE_ID_PARAM_NAME, myId);
+      PropertiesUtil.storeProperties(config, outConfigFile, null);
+    }
+
+    @Override
+    public void run() {
+      try {
+
+        if (myImage.isEternalStarting()) return;
+
+        copyAgentToDestFolder();
+        updateAgentProperties(myData);
+
+        doStart();
+        myStatus = InstanceStatus.RUNNING;
+      } catch (final Exception e) {
+        processError(e);
+      }
+    }
   }
 }

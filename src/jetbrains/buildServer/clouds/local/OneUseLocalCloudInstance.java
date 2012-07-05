@@ -21,11 +21,14 @@ import jetbrains.buildServer.clouds.CloudInstanceUserData;
 import jetbrains.buildServer.util.FileUtil;
 import org.jetbrains.annotations.NotNull;
 
+import java.util.concurrent.ScheduledExecutorService;
+
 public class OneUseLocalCloudInstance extends LocalCloudInstance {
 
   public OneUseLocalCloudInstance(@NotNull final String instanceId,
-                                  @NotNull final LocalCloudImage image) {
-    super(image, instanceId);
+                                  @NotNull final LocalCloudImage image,
+                                  @NotNull final ScheduledExecutorService executor) {
+    super(image, instanceId, executor);
   }
 
   @Override

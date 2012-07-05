@@ -19,6 +19,7 @@ package jetbrains.buildServer.clouds.local;
 import jetbrains.buildServer.clouds.*;
 import jetbrains.buildServer.serverSide.AgentDescription;
 import jetbrains.buildServer.serverSide.BuildServerAdapter;
+import jetbrains.buildServer.util.NamedDeamonThreadFactory;
 import jetbrains.buildServer.util.StringUtil;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -27,10 +28,13 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
 
 public class LocalCloudClient extends BuildServerAdapter implements CloudClientEx {
   @NotNull private final List<LocalCloudImage> myImages = new ArrayList<LocalCloudImage>();
   @Nullable private final CloudErrorInfo myErrorInfo;
+  @NotNull private final ScheduledExecutorService myExecutor = Executors.newSingleThreadScheduledExecutor(new NamedDeamonThreadFactory("local-cloud-image"));
 
   public LocalCloudClient(@NotNull final CloudClientParameters params) {
     final String images = params.getParameter(LocalCloudConstants.IMAGES_PROFILE_SETTING);
@@ -42,7 +46,9 @@ public class LocalCloudClient extends BuildServerAdapter implements CloudClientE
     final IdGenerator imageIdGenerator = new IdGenerator();
 
     final StringBuilder error = new StringBuilder();
-    for (final  String imageInfo : StringUtil.splitByLines(images.trim())) {
+    final String[] allLines = StringUtil.splitByLines(images.trim());
+
+    for (final  String imageInfo : allLines) {
       final int atPos = imageInfo.indexOf('@');
       if (atPos < 0) {
         error.append(" Failed to parse image info: \"").append(imageInfo).append("\".");
@@ -51,7 +57,23 @@ public class LocalCloudClient extends BuildServerAdapter implements CloudClientE
 
       final String imageName = imageInfo.substring(0, atPos).trim();
       final String agentHomePath = imageInfo.substring(atPos + 1).trim();
-      myImages.add(new LocalCloudImage(imageIdGenerator.next(), imageName, agentHomePath));
+      final LocalCloudImage image = new LocalCloudImage(imageIdGenerator.next(), imageName, agentHomePath, myExecutor);
+
+      for (String line : allLines) {
+        String prefix = "@@" + imageName + ":";
+        if (!line.startsWith(prefix)) continue;
+        line = line.substring(prefix.length()).trim();
+
+        if (line.contains("reuse")) image.setIsReusable(true);
+        if (line.contains("delay")) image.setIsEternalStarting(true);
+        if (!line.startsWith("prop:")) continue;
+        String[] kv = line.substring(5).trim().split("=", 2);
+        if (kv.length == 2) {
+          image.addExtraProperty(kv[0].trim(), kv[1].trim());
+        }
+      }
+
+      myImages.add(image);
     }
     
     myErrorInfo = error.length() == 0 ? null : new CloudErrorInfo(error.substring(1));
@@ -129,6 +151,7 @@ public class LocalCloudClient extends BuildServerAdapter implements CloudClientE
       image.dispose();
     }
     myImages.clear();
+    myExecutor.shutdown();
   }
 
   @Nullable

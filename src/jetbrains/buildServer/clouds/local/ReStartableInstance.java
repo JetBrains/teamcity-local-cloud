@@ -20,14 +20,17 @@ import jetbrains.buildServer.clouds.CloudConstants;
 import jetbrains.buildServer.clouds.CloudInstanceUserData;
 import org.jetbrains.annotations.NotNull;
 
+import java.util.concurrent.ScheduledExecutorService;
+
 /**
  * @author Eugene Petrenko (eugene.petrenko@gmail.com)
  *         Date: 31.05.12 18:36
  */
 public class ReStartableInstance extends LocalCloudInstance {
   public ReStartableInstance(@NotNull String instanceId,
-                             @NotNull LocalCloudImage image) {
-    super(image, instanceId);
+                             @NotNull LocalCloudImage image,
+                             @NotNull final ScheduledExecutorService executor) {
+    super(image, instanceId, executor);
   }
 
   @Override
