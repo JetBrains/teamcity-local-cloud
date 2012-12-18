@@ -3,3 +3,4 @@ out
 *.tmp
 .idea/workspace.xml
 .idea/dictionaries/**
+dist

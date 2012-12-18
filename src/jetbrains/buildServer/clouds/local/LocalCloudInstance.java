@@ -19,6 +19,7 @@ import org.jetbrains.annotations.Nullable;
 
 import java.io.File;
 import java.io.FileFilter;
+import java.io.FilenameFilter;
 import java.io.IOException;
 import java.util.*;
 import java.util.concurrent.ScheduledExecutorService;
@@ -46,6 +47,8 @@ public abstract class LocalCloudInstance implements CloudInstance {
   private final File myBaseDir;
   @NotNull
   private final AtomicBoolean myIsAgentExtracted = new AtomicBoolean(false);
+  @NotNull
+  private final AtomicBoolean myIsAgentPermissionsUpdated = new AtomicBoolean(false);
   @NotNull
   private final AtomicBoolean myIsConfigPatched = new AtomicBoolean(false);
 
@@ -197,7 +200,8 @@ public abstract class LocalCloudInstance implements CloudInstance {
       cmd.addParameter("/c");
       cmd.addParameter(new File(workDir, "agent.bat").getAbsolutePath());
     } else {
-      cmd.setExePath(new File(workDir, SystemInfo.isWindows ? "agent.bat" : "agent.sh").getAbsolutePath());
+      cmd.setExePath("/bin/sh");
+      cmd.addParameter(new File(workDir, "agent.sh").getAbsolutePath());
     }
     cmd.addParameters(params);
 
@@ -259,6 +263,33 @@ public abstract class LocalCloudInstance implements CloudInstance {
       PropertiesUtil.storeProperties(config, outConfigFile, null);
     }
 
+    private void updateAgentPermissions() {
+      if (SystemInfo.isWindows) return;
+
+      for (String dir : new String[]{"bin", "launcher/bin"}) {
+        final File basePath = new File(myImage.getAgentHomeDir(), dir);
+        final File[] files = basePath.listFiles(new FilenameFilter() {
+          @Override
+          public boolean accept(File dir, String name) {
+            return name.endsWith(".sh");
+          }
+        });
+
+        if (files == null) {
+          LOG.warn("Failed to list files under " + basePath);
+          continue;
+        }
+
+        for (File file : files) {
+          try {
+            FileUtil.setExectuableAttribute(file.getAbsolutePath(), true);
+          } catch (IOException e) {
+            LOG.warn("Failed to set writable permission for " + file + ". " + e.getMessage());
+          }
+        }
+      }
+    }
+
     @Override
     public void run() {
       try {
@@ -266,6 +297,7 @@ public abstract class LocalCloudInstance implements CloudInstance {
         if (myImage.isEternalStarting()) return;
 
         copyAgentToDestFolder();
+        updateAgentPermissions();
         updateAgentProperties(myData);
 
         doStart();
