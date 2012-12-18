@@ -265,6 +265,7 @@ public abstract class LocalCloudInstance implements CloudInstance {
 
     private void updateAgentPermissions() {
       if (SystemInfo.isWindows) return;
+      if (!myIsAgentPermissionsUpdated.compareAndSet(false, true)) return;
 
       for (String dir : new String[]{"bin", "launcher/bin"}) {
         final File basePath = new File(myImage.getAgentHomeDir(), dir);
