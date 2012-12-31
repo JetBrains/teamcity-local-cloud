@@ -25,10 +25,19 @@
   <td>
     <props:multilineProperty name="${paramName}" className="longField" linkTitle="Agent images to run" cols="55" rows="5" expanded="${true}"/>
     <span class="smallNote">
-      List of agent images, each on new line. Image format: "&lt;Image name&gt;@&lt;Local path to agent installation folder&gt;".
-      <br />
-      If image name starts with <em><%=LocalCloudConstants.RESULTABLE_PREFIX%></em> prefix,
-      agents will not be removed and will be restarted in on-demand basis.
+      List of agent images, each on new line.
+      <br/>
+      Image format: <strong>&lt;Image name&gt;@&lt;server-local path to agent installation folder&gt;</strong>
+      <br/>
+      Additional settins are specified in the following format:
+      <br/>
+      <strong>@@&lt;Image name&gt;:&lt;parameter&gt;</strong>,
+      <br/>
+      where parameter could be:
+      <br/>
+      <strong>reuse</strong> to enable agent copies re-use or
+      <br/>
+      <strong>prop:&lt;agent property&gt;=&lt;value&gt;</strong> additional property for <em>buildAgent.configuration</em> file
     </span>
   </td>
 </tr>

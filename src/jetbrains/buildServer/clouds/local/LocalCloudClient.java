@@ -48,7 +48,10 @@ public class LocalCloudClient extends BuildServerAdapter implements CloudClientE
     final StringBuilder error = new StringBuilder();
     final String[] allLines = StringUtil.splitByLines(images.trim());
 
-    for (final  String imageInfo : allLines) {
+    for (String imageInfo : allLines) {
+      imageInfo = imageInfo.trim();
+      if (imageInfo.isEmpty() || imageInfo.startsWith("@@")) continue;
+
       final int atPos = imageInfo.indexOf('@');
       if (atPos < 0) {
         error.append(" Failed to parse image info: \"").append(imageInfo).append("\".");
