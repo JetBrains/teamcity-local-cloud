@@ -39,7 +39,7 @@ public class OneUseLocalCloudInstance extends LocalCloudInstance {
   @Override
   protected void cleanupStoppedInstance() {
     getImage().forgetInstance(this);
-    FileUtil.delete(getBaseDir());
+    FileUtil.symlinkAwareDelete(getBaseDir());
   }
 
   @Override
