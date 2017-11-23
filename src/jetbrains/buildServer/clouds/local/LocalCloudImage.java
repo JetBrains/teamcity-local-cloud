@@ -102,6 +102,12 @@ public class LocalCloudImage implements CloudImage {
   }
 
   @Nullable
+  @Override
+  public Integer getAgentPoolId() {
+    return null;
+  }
+
+  @Nullable
   public CloudErrorInfo getErrorInfo() {
     return myErrorInfo;
   }
