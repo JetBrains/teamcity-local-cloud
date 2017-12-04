@@ -14,7 +14,7 @@
           <element id="dir-copy" path="$PROJECT_DIR$/resources" />
         </element>
       </element>
-      <element id="file-copy" path="$PROJECT_DIR$/teamcity-plugin-dist.xml" output-file-name="teamcity-plugint.xml" />
+      <element id="file-copy" path="$PROJECT_DIR$/teamcity-plugin-dist.xml" output-file-name="teamcity-plugin.xml" />
     </root>
   </artifact>
 </component>
