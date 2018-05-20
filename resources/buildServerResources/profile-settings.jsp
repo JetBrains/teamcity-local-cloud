@@ -25,11 +25,11 @@
   <td>
     <props:multilineProperty name="${paramName}" className="longField" linkTitle="Agent images to run" cols="55" rows="5" expanded="${true}"/>
     <span class="smallNote">
-      List of agent images, each on new line.
+      List of agent images, each on a new line.
       <br/>
       Image format: <strong>&lt;Image name&gt;@&lt;server-local path to agent installation folder&gt;</strong>
       <br/>
-      Additional settins are specified in the following format:
+      Additional settings are specified in the following format:
       <br/>
       <strong>@@&lt;Image name&gt;:&lt;parameter&gt;</strong>,
       <br/>
