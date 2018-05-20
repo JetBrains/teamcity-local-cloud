@@ -37,6 +37,8 @@
       <br/>
       <strong>reuse</strong> to enable agent copies re-use or
       <br/>
+      <strong>agentPoolId:&lt;agent pool id&gt;</strong> to authorize cloud agents in a pool with specified id
+      <br/>
       <strong>prop:&lt;agent property&gt;=&lt;value&gt;</strong> additional property for <em>buildAgent.configuration</em> file
     </span>
   </td>
