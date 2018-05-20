@@ -17,6 +17,7 @@
 package jetbrains.buildServer.clouds.local;
 
 import jetbrains.buildServer.clouds.*;
+import jetbrains.buildServer.serverSide.agentPools.AgentPool;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -37,6 +38,7 @@ public class LocalCloudImage implements CloudImage {
   @Nullable private final CloudErrorInfo myErrorInfo;
   private boolean myIsReusable;
   private boolean myIsEternalStarting;
+  private Integer myAgentPoolId;
   private final Map<String, String> myExtraProperties = new HashMap<String, String>();
   @NotNull private final ScheduledExecutorService myExecutor;
 
@@ -65,6 +67,10 @@ public class LocalCloudImage implements CloudImage {
 
   public void setIsEternalStarting(boolean isEternalStarting) {
     myIsEternalStarting = isEternalStarting;
+  }
+
+  public void setAgentPoolId(int agentPoolId) {
+    myAgentPoolId = agentPoolId;
   }
 
   public void addExtraProperty(@NotNull final String name, @NotNull final String value) {
@@ -104,7 +110,7 @@ public class LocalCloudImage implements CloudImage {
   @Nullable
   @Override
   public Integer getAgentPoolId() {
-    return null;
+    return myAgentPoolId;
   }
 
   @Nullable

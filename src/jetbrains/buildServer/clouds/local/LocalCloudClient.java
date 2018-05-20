@@ -17,6 +17,7 @@
 package jetbrains.buildServer.clouds.local;
 
 import jetbrains.buildServer.clouds.*;
+import jetbrains.buildServer.log.Loggers;
 import jetbrains.buildServer.serverSide.AgentDescription;
 import jetbrains.buildServer.serverSide.BuildServerAdapter;
 import jetbrains.buildServer.util.NamedDeamonThreadFactory;
@@ -69,6 +70,15 @@ public class LocalCloudClient extends BuildServerAdapter implements CloudClientE
 
         if (line.contains("reuse")) image.setIsReusable(true);
         if (line.contains("delay")) image.setIsEternalStarting(true);
+        if (line.contains("agentPoolId:")) {
+          String poolIdStr = line.substring("agentPoolId:".length());
+          try {
+            Integer poolId = Integer.parseInt(poolIdStr);
+            image.setAgentPoolId(poolId);
+          } catch (NumberFormatException e) {
+            Loggers.SERVER.warnAndDebugDetails("Could not parse local cloud image pool id parameter", e);
+          }
+        }
         if (!line.startsWith("prop:")) continue;
         String[] kv = line.substring(5).trim().split("=", 2);
         if (kv.length == 2) {
