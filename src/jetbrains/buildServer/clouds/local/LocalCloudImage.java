@@ -50,7 +50,8 @@ public class LocalCloudImage implements CloudImage {
     myName = imageName;
     myAgentHomeDir = new File(agentHomePath);
     myExecutor = executor;
-    myErrorInfo = myAgentHomeDir.isDirectory() ? null : new CloudErrorInfo("\"" + agentHomePath + "\" is not a directory or does not exist.");
+    myErrorInfo = myAgentHomeDir.isDirectory() || (myAgentHomeDir.isFile() && myAgentHomeDir.getName().endsWith(".zip")) ? null
+            : new CloudErrorInfo("\"" + agentHomePath + "\" is not a directory or a zip archive or does not exist.");
   }
 
   public boolean isReusable() {

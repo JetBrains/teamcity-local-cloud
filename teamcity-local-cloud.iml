@@ -109,7 +109,25 @@
     <orderEntry type="module-library">
       <library>
         <CLASSES>
-          <root url="jar://$TeamCityDistribution$/webapps/ROOT/WEB-INF/lib/log4j-1.2.12.jar!/" />
+          <root url="jar://$TeamCityDistribution$/webapps/ROOT/WEB-INF/lib/log4j-api-2.17.2.jar!/" />
+        </CLASSES>
+        <JAVADOC />
+        <SOURCES />
+      </library>
+    </orderEntry>
+    <orderEntry type="module-library">
+      <library>
+        <CLASSES>
+          <root url="jar://$TeamCityDistribution$/webapps/ROOT/WEB-INF/lib/log4j-1.2-api-2.17.2.jar!/" />
+        </CLASSES>
+        <JAVADOC />
+        <SOURCES />
+      </library>
+    </orderEntry>
+    <orderEntry type="module-library">
+      <library>
+        <CLASSES>
+          <root url="jar://$TeamCityDistribution$/webapps/ROOT/WEB-INF/lib/log4j-core-2.17.2.jar!/" />
         </CLASSES>
         <JAVADOC />
         <SOURCES />

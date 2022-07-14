@@ -2,6 +2,7 @@ package jetbrains.buildServer.clouds.local;
 
 import com.intellij.execution.configurations.GeneralCommandLine;
 import com.intellij.openapi.util.SystemInfo;
+import com.intellij.util.io.ZipUtil;
 import jetbrains.buildServer.ExecResult;
 import jetbrains.buildServer.SimpleCommandLineProcessRunner;
 import jetbrains.buildServer.clouds.CloudErrorInfo;
@@ -224,15 +225,29 @@ public abstract class LocalCloudInstance implements CloudInstance {
       if (myIsAgentExtracted.getAndSet(true)) return;
 
       final File agentHomeDir = myImage.getAgentHomeDir();
-      FileUtil.copyDir(agentHomeDir, myBaseDir, new FileFilter() {
-        private final Set<String> ourDirsToNotToCopy = new HashSet<String>() {{
-          Collections.addAll(this, "work", "temp", "system", "contrib");
-        }};
+      if (agentHomeDir.isDirectory()) {
+        FileUtil.copyDir(agentHomeDir, myBaseDir, new FileFilter() {
+          private final Set<String> ourDirsToNotToCopy = new HashSet<String>() {{
+            Collections.addAll(this, "work", "temp", "system", "contrib");
+          }};
 
-        public boolean accept(@NotNull final File file) {
-          return !file.isDirectory() || !file.getParentFile().equals(agentHomeDir) || !ourDirsToNotToCopy.contains(file.getName());
-        }
-      });
+          public boolean accept(@NotNull final File file) {
+            return !file.isDirectory() || !file.getParentFile().equals(agentHomeDir) || !ourDirsToNotToCopy.contains(file.getName());
+          }
+        });
+      } else if (agentHomeDir.isFile() && agentHomeDir.getName().endsWith(".zip")) {
+        ZipUtil.extract(agentHomeDir, myBaseDir, new FilenameFilter() {
+
+          private final Set<String> ourDirsToNotToCopy = new HashSet<String>() {{
+            Collections.addAll(this, "work", "temp", "system", "contrib");
+          }};
+
+            public boolean accept(File dir, String name) {
+              final File file = new File(dir, name);
+              return !file.isDirectory() || !file.getParentFile().equals(agentHomeDir) || !ourDirsToNotToCopy.contains(file.getName());
+            }
+        });
+      }
     }
 
     private void updateAgentProperties(@NotNull final CloudInstanceUserData data) throws IOException {
