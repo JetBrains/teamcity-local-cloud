@@ -1,6 +1,7 @@
 package jetbrains.buildServer.clouds.local;
 
 import com.intellij.execution.configurations.GeneralCommandLine;
+import com.intellij.openapi.diagnostic.Logger;
 import com.intellij.openapi.util.SystemInfo;
 import com.intellij.util.io.ZipUtil;
 import jetbrains.buildServer.ExecResult;
@@ -14,7 +15,6 @@ import jetbrains.buildServer.util.ExceptionUtil;
 import jetbrains.buildServer.util.FileUtil;
 import jetbrains.buildServer.util.PropertiesUtil;
 import jetbrains.buildServer.util.WaitFor;
-import org.apache.log4j.Logger;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -35,7 +35,7 @@ import static jetbrains.buildServer.clouds.local.LocalCloudConstants.INSTANCE_ID
  */
 public abstract class LocalCloudInstance implements CloudInstance {
   @NotNull
-  private static final Logger LOG = Logger.getLogger(LocalCloudInstance.class);
+  private static final Logger LOG = Logger.getInstance(LocalCloudInstance.class);
   private static final int STATUS_WAITING_TIMEOUT = 30 * 1000;
 
   @NotNull
